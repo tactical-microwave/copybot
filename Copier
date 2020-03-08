@@ -1,0 +1,25 @@
+import tkinter as tk
+from tkinter import font, filedialog
+import pyperclip
+import time
+
+def pasting():
+    txt=''
+    while True:
+        time.sleep(.1)
+        if (txt!=pyperclip.paste()):
+            txt=pyperclip.paste()
+            print(txt)
+            label["text"]=txt
+
+root=tk.Tk()
+
+root.geometry("600x600")
+frame=tk.Frame(root,bg='#6C3483',bd=5)
+frame.place(relwidth=1, relheight=1)
+label=tk.Label(frame, bg='white', bd=5, font=("Calibri",20),anchor='nw',justify='left')
+label.place( relwidth=1, relheight=1)
+pyperclip.copy('')
+pasting()
+
+root.mainloop()
