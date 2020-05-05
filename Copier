@@ -1,14 +1,17 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import font, filedialog, messagebox
+import pyautogui
 import pyperclip
 import os
 
-tot=list()
-final=list()
+coord=list()
+temp=list()
 txt=str(" ")
 active=True
 edit=False
+ini_dir=os.getcwd()
+dir_control=1
 
 def collecting():
     global txt
@@ -16,41 +19,55 @@ def collecting():
     if(active is True):
         if (txt!=pyperclip.paste()):
             txt=pyperclip.paste()
-            tot.append(txt)
             textbox.config(state="normal")
-            textbox.insert(tk.INSERT,txt)
-            final=textbox.get("1.0",tk.END)
+            textbox.insert(tk.INSERT,(txt+"#"+"\n"))
             textbox.config(state="disabled")
         root.after(10, collecting)
     else:
         return
 
 def clear_all():
-    tot.clear()
-    final.clear()
+    coord.clear()
     textbox.config(state="normal")
     textbox.delete('1.0',tk.END)
     textbox.config(state="disabled")
 
+def change_dir():
+    if(dir_control==1):
+        pass
+    else:
+        path=os.getcwd()
+        dir=os.listdir(path)
+        if(len(dir)==0):
+            pass
+        else:
+            j=path[-1]
+            j=int(j)+1
+            os.chdir(ini_dir)
+            os.makedirs("Frequency_"+str(j))
+            os.chdir(ini_dir+"\\Frequency_"+str(j))
+            clear_all()
+
 def save_file():
     f=filedialog.asksaveasfile(mode="a", defaultextension=".txt")
-    final=textbox.get("1.0",tk.END)
+    temp=textbox.get("1.0",tk.END)
+    coord=temp.split("#")
     if f is None:
         return
-    for i in final:
+    for i in coord:
         f.write(i)
 
 def mode_change():
     global active
     if(active is True):
         active=False
-        label["text"]="Paused"
+        label["text"]="Copier Paused"
         label["bg"]="#F1948A"
     else:
         active=True
         pyperclip.copy(" ")
         root.after(10,collecting)
-        label["text"]="Working"
+        label["text"]="Copier Working"
         label["bg"]="#82E0AA"
 
 def edit_data():
@@ -58,29 +75,64 @@ def edit_data():
     if(edit is False):
         edit=True
         textbox.config(state="normal")
-        #final=textbox.get("1.0",tk.END)
         label_2["text"]="Editable"
         label_2["bg"]="#F1948A"
 
     else:
         edit=False
         textbox.config(state="disabled")
-        #final=textbox.get("1.0",tk.END)
         label_2["text"]="Uneditable"
         label_2["bg"]="#82E0AA"
 
+def save_sep():
+    global dir_control
+    temp=textbox.get("1.0",tk.END)
+    coord=temp.split("#")
+    if(len(coord)!=0):
+        del coord[-1]
+    count = 1
+    if(dir_control==1):
+        os.makedirs("Frequency_1")
+        os.chdir(ini_dir+"\\Frequency_1")
+        curr_dir=os.getcwd()
+        dir_control=dir_control+1
+    for data in coord:
+        output = open('file' + str(count) + '.txt', 'w')
+        output.write(''.join(data))
+        count += 1
+        output.close()
+
+def delay():
+    root.after(3000, autoclicker)
+    root.after(3714, autoclicker)
+    root.after(4428, autoclicker)
+    root.after(5142, autoclicker)
+    root.after(5856, autoclicker)
+    root.after(6570, autoclicker)
+    root.after(7284, autoclicker)
+
+def autoclicker():
+    pyautogui.click(1200,700)
+
+def check_dir_state():
+    curr_dir=os.getcwd()
+    label_3["text"]="Current Directory> "+curr_dir
+    root.after(1, check_dir_state)
+
+
 root=tk.Tk()
 
-root.geometry("600x600")
+root.title("CLIPBOARD")
 
-scrollbar=tk.Scrollbar(root)
-scrollbar.pack(side=tk.RIGHT,fill="y")
+root.geometry("600x600")
 
 menubar=tk.Menu(root)
 root.config(menu=menubar)
 submenu_1=tk.Menu(menubar, tearoff=0)
 menubar.add_cascade(label="File", menu=submenu_1)
-submenu_1.add_command(label="Save As", command=save_file)
+submenu_1.add_command(label="New Frequency", command=change_dir)
+submenu_1.add_command(label="Save All", command=save_file)
+submenu_1.add_command(label="Save Individually", command=save_sep)
 submenu_1.add_command(label="Clear All", command=clear_all)
 submenu_1.add_command(label="Exit", command=root.destroy)
 
@@ -90,23 +142,32 @@ menubar.add_cascade(label="Options", menu=submenu_2)
 submenu_2.add_command(label="Start/Pause", command=mode_change)
 submenu_2.add_command(label="Edit", command=edit_data)
 
+submenu_3=tk.Menu(menubar, tearoff=0)
+menubar.add_cascade(label="Autoclicker", menu=submenu_3)
+submenu_3.add_command(label="Execute", command=delay)
+
 frame=tk.Frame(root)
 frame.place(relwidth=1,relheight=1)
 
-label=tk.Label(frame, bg="#82E0AA", text="Working")
+label=tk.Label(frame, bg="#82E0AA", text="Copier Working")
 label.place(relx=0,rely=0,relwidth=1,relheight=0.05)
 
 label_2=tk.Label(frame, bg="#82E0AA", text="Uneditable")
 label_2.place(relx=0,rely=0.05,relwidth=1,relheight=0.05)
 
-textbox=tk.Text(frame, bg='#D0D3D4', height=2000, bd=5, font=("Calibri",10), yscrollcommand=scrollbar.set)
-textbox.place(relx=0,rely=0.1, relwidth=1,relheight=0.9)
-textbox.config(state="disabled")
+label_3=tk.Label(frame, bg="#D2B4DE", text="Current Directory> "+ini_dir)
+label_3.place(relx=0,rely=0.1,relwidth=1,relheight=0.02)
+
+textbox=tk.Text(frame, bg='#D0D3D4', height=2000, bd=5, font=("Calibri",10))
+textbox.place(relx=0,rely=0.12, relwidth=1,relheight=0.88)
+scrollbar=tk.Scrollbar(textbox)
+scrollbar.pack(side=tk.RIGHT,fill="y")
+textbox.config(state="disabled", yscrollcommand=scrollbar.set)
 
 scrollbar.config(command=textbox.yview)
 
 pyperclip.copy(" ")
 collecting()
+check_dir_state()
 
 root.mainloop()
-
