@@ -4,14 +4,31 @@ from tkinter import font, filedialog, messagebox
 import pyautogui
 import pyperclip
 import os
+import tarfile
+import paramiko
+import time
 
 coord=list()
 temp=list()
+folders=list()
+folder_names=list()
+file_names=list()
+file_names_xyz=list()
+file_names_input=list()
+OptionList_2=list()
 txt=str(" ")
 active=True
 edit=False
 ini_dir=os.getcwd()
-dir_control=1
+if(os.path.isdir(ini_dir+"//Coordinate Files") is False):
+    os.mkdir(ini_dir+"//Coordinate Files")
+else:
+    pass
+ini_dir=ini_dir+"//Coordinate Files"
+global cycle_time, num_coord, interval
+cycle_time=5000
+num_coord=7
+interval=cycle_time/num_coord
 
 def collecting():
     global txt
@@ -33,29 +50,32 @@ def clear_all():
     textbox.config(state="disabled")
 
 def change_dir():
-    if(dir_control==1):
+    all=os.listdir(ini_dir)
+    for i in all:
+        if((os.path.isfile(ini_dir+"\\"+i))is False):
+            folders.append(ini_dir+"\\"+i)
+    num_folder=len(folders)
+    for i in folders:
+        temporary=i.split("\\")
+        folder_names.append(temporary[-1])
+    last=0
+    for j in range(num_folder+1):
+        for i in folder_names:
+            if(i==("Frequency_"+str(j))):
+                last=j
+            else:
+                pass
+    if(len(folder_names)==0):
+        last=0
+    path=os.getcwd()
+    dir=os.listdir(path)
+    if(len(dir)==0):
         pass
     else:
-        path=os.getcwd()
-        dir=os.listdir(path)
-        if(len(dir)==0):
-            pass
-        else:
-            j=path[-1]
-            j=int(j)+1
-            os.chdir(ini_dir)
-            os.makedirs("Frequency_"+str(j))
-            os.chdir(ini_dir+"\\Frequency_"+str(j))
-            clear_all()
-
-def save_file():
-    f=filedialog.asksaveasfile(mode="a", defaultextension=".txt")
-    temp=textbox.get("1.0",tk.END)
-    coord=temp.split("#")
-    if f is None:
-        return
-    for i in coord:
-        f.write(i)
+        os.chdir(ini_dir)
+        os.makedirs("Frequency_"+str(last+1))
+        os.chdir(ini_dir+"\\Frequency_"+str(last+1))
+        clear_all()
 
 def mode_change():
     global active
@@ -85,45 +105,327 @@ def edit_data():
         label_2["bg"]="#82E0AA"
 
 def save_sep():
-    global dir_control
+    global ini_dir
     temp=textbox.get("1.0",tk.END)
     coord=temp.split("#")
     if(len(coord)!=0):
         del coord[-1]
     count = 1
-    if(dir_control==1):
-        os.makedirs("Frequency_1")
+
+    all=os.listdir(ini_dir)
+    for i in all:
+        if((os.path.isfile(ini_dir+"\\"+i))is False):
+            folders.append(ini_dir+"\\"+i)
+    num_folder=len(folders)
+    for i in folders:
+        temporary=i.split("\\")
+        folder_names.append(temporary[-1])
+    last=0
+    for j in range(num_folder+1):
+        for i in folder_names:
+            if(i==("Frequency_"+str(j))):
+                last=j
+            else:
+                pass
+    if(len(folder_names)==0):
+        last=0
+    else:
+        pass
+    if(last==0):
+        os.makedirs(ini_dir+"\\Frequency_1")
         os.chdir(ini_dir+"\\Frequency_1")
         curr_dir=os.getcwd()
-        dir_control=dir_control+1
+    else:
+        path=os.getcwd()
+        dir=os.listdir(path)
+        if(len(dir)==0):
+            pass
+        else:
+            os.chdir(ini_dir)
+            os.makedirs("Frequency_"+str(last+1))
+            os.chdir(ini_dir+"\\Frequency_"+str(last+1))
     for data in coord:
-        output = open('file' + str(count) + '.txt', 'w')
-        output.write(''.join(data))
+        nlines = (data.lstrip()).count('\n')
+        lines=data.splitlines()
+        output = open('file' + str(count) + '.xyz', 'a')
+        text_block=""
+        for line in lines:
+            line=str(line)
+            line=line.replace("64","66",1)
+            text_block+=line+"\n"
+        output.write(str(nlines)+"\n"+"Angstrom"+"\n"+text_block.lstrip())
         count += 1
         output.close()
 
-def delay():
-    root.after(3000, autoclicker)
-    root.after(3714, autoclicker)
-    root.after(4428, autoclicker)
-    root.after(5142, autoclicker)
-    root.after(5856, autoclicker)
-    root.after(6570, autoclicker)
-    root.after(7284, autoclicker)
+def input_file_add():
+    part_1="&GATEWAY\n"+"COORD\n"
+    part_2="\nBASIS\n"
+    part_3="\nGROUP=NOSYM\n"+"ANGM\n"
+    part_4="\nSDIPolar"+"\nAMFI"+"\nDouglas-Kroll"+"\n&SEWARD"+"\nCholesky"+"\n&GUESSORB"+"\nPRMO"+"\n3"+"\nPRPOpulation"
+    curr_dir=os.getcwd()
+    basis=entry.get()
+    for i in range(1,len(curr_dir)+1):
+        try:
+            reading=open('file'+str(i)+'.xyz','r')
+            tot_txt=(reading.read())
+            lines=tot_txt.splitlines()
+            items=lines[2].split()
+            angm=items[1]+"\t"+items[2]+"\t"+items[3]
+            if(basis==""):
+                basis="<ENTER BASIS SET IN ENTRY BOX>"
+            print_txt=part_1+"file"+str(i)+".xyz"+part_2+basis+part_3+angm+part_4
+            writing=open('file'+str(i)+'.input','w')
+            writing.write(print_txt)
+            reading.close()
+            writing.close()
+        except:
+            pass
+
+def locate_run():
+    global x,y
+    global cycle_time, num_coord, interval
+    wait_time=1000
+    interval=cycle_time/num_coord
+    try:
+        x,y=pyautogui.locateCenterOnScreen(r"C:\Users\dell\Desktop\Autoclicker_MOD\Copy_button.PNG")
+        label_4["text"]="Copy button found!!!"
+        label_4["bg"]="#82E0AA"
+        root.after(wait_time, autoclicker)
+        for i in range(1,num_coord):
+            root.after(int(wait_time+interval), autoclicker)
+            wait_time=wait_time+interval
+    except:
+        label_4["text"]="Copy button not found!!!"
+        label_4["bg"]="#F1948A"
 
 def autoclicker():
-    pyautogui.click(1200,700)
+    pyautogui.click(x,y)
 
 def check_dir_state():
     curr_dir=os.getcwd()
     label_3["text"]="Current Directory> "+curr_dir
     root.after(1, check_dir_state)
 
+def check_XYZfiles():
+    curr_dir=os.getcwd()
+    xyz=0
+    all_xyz=os.listdir(curr_dir)
+    for i in all_xyz:
+        temp_xyz=i.split(".")
+        file_names_xyz.append(temp_xyz[-1])
+    for i in file_names_xyz:
+        if(i=="xyz"):
+            xyz=xyz+1
+    all_xyz.clear()
+    file_names_xyz.clear()
+    try:
+        checking=open("file1.xyz",'r')
+        label_7["text"]="XYZ files generated"+"("+str(xyz)+")"
+        label_7["bg"]="#82E0AA"
+        checking.close()
+    except:
+        label_7["text"]="XYZ files not generated"
+        label_7["bg"]="#F1948A"
+    root.after(1,check_XYZfiles)
+
+def check_inputfiles():
+    curr_dir=os.getcwd()
+    input=0
+    all_input=os.listdir(curr_dir)
+    for i in all_input:
+        temp_input=i.split(".")
+        file_names_input.append(temp_input[-1])
+    for i in file_names_input:
+        if(i=="input"):
+            input=input+1
+    all_input.clear()
+    file_names_input.clear()
+    try:
+        checking_input=open("file1.input",'r')
+        label_5["text"]="Input files generated"+"("+str(input)+")"
+        label_5["bg"]="#82E0AA"
+        checking_input.close()
+    except:
+        label_5["text"]="Input files not generated"
+        label_5["bg"]="#F1948A"
+    root.after(1,check_inputfiles)
+
+def close_window():
+    print("PROGRAM QUIT")
+    os.chdir(ini_dir)
+    path=ini_dir
+    all_3=os.listdir(path)
+    print(all_3)
+    num_3=len(all_3)
+    for i in range(1,num_3+2):
+        try:
+            if((len(os.listdir(path+"\\Frequency_"+str(i))))==0):
+                os.rmdir((path+"\\Frequency_"+str(i)))
+        except:
+            pass
+    root.destroy()
+
+def stat_check():
+    curr_dir=os.getcwd()
+    xyz=0
+    input=0
+    all_2=os.listdir(curr_dir)
+    num_folder=len(all_2)
+    for i in all_2:
+        temp_2=i.split(".")
+        file_names.append(temp_2[-1])
+    for i in file_names:
+        if(i=="xyz"):
+            xyz=xyz+1
+        if(i=="input"):
+            input=input+1
+    messagebox.showinfo("Status report","There are "+str(xyz)+" coordinate files here.\n"+"There are "+str(input)+" input files here.\n")
+    all_2.clear()
+    file_names.clear()
+
+def dir_select():
+    global curr_dir
+    dir_name=filedialog.askdirectory(initialdir=ini_dir, title="Select Folder")
+    if(dir_name!=''):
+        os.chdir(dir_name)
+        print("DIRECTORY CHANGED TO ->"+dir_name)
+    else:
+        print("NO DIRECTORY SELECTED")
+        pass
+
+def root_select():
+    global ini_dir
+    global last
+    root_name=filedialog.askdirectory(initialdir=r"C:\Users\dell\Desktop", title="Select Folder")
+    if(root_name!=''):
+        head_tail=os.path.split(root_name)
+        if(head_tail[1]=="Coordinate Files"):
+            ini_dir=root_name
+        else:
+            if(os.path.isdir(root_name+"//Coordinate Files") is False):
+                os.mkdir(root_name+"//Coordinate Files")
+            ini_dir=root_name+"//Coordinate Files"
+            os.chdir(ini_dir)
+        #if(os.path.isdir(ini_dir+"//Coordinate Files") is False):
+            #os.mkdir(root_name+"//Coordinate Files")
+        #else:
+            #pass
+        print("ROOT CHANGED TO ->"+ini_dir)
+        last=0
+        folders.clear()
+        folder_names.clear()
+        label_8["text"]="ROOT DIRECTORY> "+ini_dir
+    else:
+        print("NO ROOT SELECTED")
+        pass
+
+def input_file_del():
+    curr_dir=os.getcwd()
+    all=os.listdir(curr_dir)
+    num=len(all)
+    for i in range(1,num+1):
+        try:
+            os.remove(curr_dir+"\\file"+str(i)+".input")
+        except:
+            pass
+    print("DELETION COMPLETED")
+
+def save_add():
+    curr_dir=os.getcwd()
+    xyz=0
+    all_xyz=os.listdir(curr_dir)
+    for i in all_xyz:
+        temp_xyz=i.split(".")
+        file_names_xyz.append(temp_xyz[-1])
+    for i in file_names_xyz:
+        if(i=="xyz"):
+            xyz=xyz+1
+    all_xyz.clear()
+    temp=textbox.get("1.0",tk.END)
+    coord=temp.split("#")
+    if(len(coord)!=0):
+        del coord[-1]
+    for data in coord:
+        nlines = (data.lstrip()).count('\n')
+        lines=data.splitlines()
+        output = open('file' + str(xyz+1) + '.xyz', 'a')
+        text_block=""
+        for line in lines:
+            line=str(line)
+            line=line.replace("64","66",1)
+            text_block+=line+"\n"
+        output.write(str(nlines)+"\n"+"Angstrom"+"\n"+text_block.lstrip())
+        xyz += 1
+        output.close()
+
+def auto_setup():
+    global cycle_time, num_coord, variable, nv
+    top=tk.Toplevel(root)
+    top.title("SETUP")
+    top.geometry("300x100")
+    top_frame=tk.Frame(top)
+    top_frame.place(relwidth=1,relheight=1)
+    toplabel_1=tk.Label(top_frame, bg="#82E0AA", text="Cycle Time(in s):")
+    toplabel_1.place(relx=0,rely=0,relwidth=0.5,relheight=0.25)
+    toplabel_2=tk.Label(top_frame, bg="#82E0AA", text="Number of Coordinates:")
+    toplabel_2.place(relx=0,rely=0.25,relwidth=0.5,relheight=0.25)
+
+    OptionList = ["1", "2", "5", "10"]
+    variable = tk.StringVar(top)
+    variable.set(OptionList[2])
+    opt = tk.OptionMenu(top_frame, variable, *OptionList)
+    opt.place(relx=0.5,rely=0,relwidth=0.5,relheight=0.25)
+
+    for i in range(5,21):
+        OptionList_2.append(i)
+    nv= tk.StringVar(top)
+    nv.set(OptionList_2[2])
+    opt_2= tk.OptionMenu(top_frame, nv, *OptionList_2)
+    opt_2.place(relx=0.5,rely=0.25,relwidth=0.5,relheight=0.25)
+
+    topbutton_1=tk.Button(top_frame, text="Save", command=gather_val)
+    topbutton_1.place(relx=0,rely=0.5,relwidth=1,relheight=0.25)
+    topbutton_2=tk.Button(top_frame, text="Reset to Default", command=default_val)
+    topbutton_2.place(relx=0,rely=0.75,relwidth=1,relheight=0.25)
+    top.mainloop()
+
+def gather_val():
+    global cycle_time, num_coord, variable, nv
+    temp_cycle=int(variable.get())
+    cycle_time=temp_cycle*1000
+    num_coord=int(nv.get())
+
+def default_val():
+    global cycle_time, num_coord
+    cycle_time=5000
+    num_coord=7
+
+def check_autosetup():
+    label_9["text"]=("AUTOCLICKER OPTIONS> Cycle Time: "+str(int(cycle_time/1000))+"s ; Number of Coordinates: "+str(num_coord))
+    root.after(1,check_autosetup)
+
+def file_upload_ssh():
+    global ini_dir
+    os.chdir(ini_dir)
+    timestr= time.strftime("%d_%m_%Y_%H_%M_%S")
+    ssh_client=paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(hostname=ip,username=user_name,password=passwd)
+    ftp_client=ssh_client.open_sftp()
+    #/home/rajaraman/Anindya_Python_Test
+    tar = tarfile.open((timestr+".tar.gz"), "w:gz")
+    tar.add(ini_dir, arcname=timestr)
+    print("TAR GENERATED!!!")
+    tar.close()
+    ftp_client.put(ini_dir+"//"+timestr+".tar.gz", "/home/rajaraman/Anindya_Python_Test/Tar_Files/"+timestr+".tar.gz")
+    cmd="tar -C /home/rajaraman/Anindya_Python_Test/Files -xzf /home/rajaraman/Anindya_Python_Test/Tar_Files/"+timestr+".tar.gz"
+    stdin,stdout,stderr=ssh_client.exec_command(cmd)
+    print("UPLOADED")
 
 root=tk.Tk()
 
+root.protocol("WM_DELETE_WINDOW", close_window)
 root.title("CLIPBOARD")
-
 root.geometry("600x600")
 
 menubar=tk.Menu(root)
@@ -131,43 +433,72 @@ root.config(menu=menubar)
 submenu_1=tk.Menu(menubar, tearoff=0)
 menubar.add_cascade(label="File", menu=submenu_1)
 submenu_1.add_command(label="New Frequency", command=change_dir)
-submenu_1.add_command(label="Save All", command=save_file)
-submenu_1.add_command(label="Save Individually", command=save_sep)
+submenu_1.add_command(label="Select New Root", command=root_select)
+submenu_1.add_command(label="Select Directory", command=dir_select)
+submenu_1.add_command(label="Save Separately", command=save_sep)
+submenu_1.add_command(label="Add to current directory", command=save_add)
+submenu_1.add_command(label="Create input files", command=input_file_add)
+submenu_1.add_command(label="Remove input files", command=input_file_del)
+submenu_1.add_command(label="Upload Files to Server", command=file_upload_ssh)
 submenu_1.add_command(label="Clear All", command=clear_all)
-submenu_1.add_command(label="Exit", command=root.destroy)
-
+submenu_1.add_command(label="Exit", command=close_window)
 
 submenu_2=tk.Menu(menubar, tearoff=0)
 menubar.add_cascade(label="Options", menu=submenu_2)
 submenu_2.add_command(label="Start/Pause", command=mode_change)
 submenu_2.add_command(label="Edit", command=edit_data)
+submenu_2.add_command(label="Check Status", command=stat_check)
 
 submenu_3=tk.Menu(menubar, tearoff=0)
 menubar.add_cascade(label="Autoclicker", menu=submenu_3)
-submenu_3.add_command(label="Execute", command=delay)
+submenu_3.add_command(label="Run", command=locate_run)
+submenu_3.add_command(label="Setup", command=auto_setup)
 
 frame=tk.Frame(root)
 frame.place(relwidth=1,relheight=1)
 
 label=tk.Label(frame, bg="#82E0AA", text="Copier Working")
-label.place(relx=0,rely=0,relwidth=1,relheight=0.05)
+label.place(relx=0,rely=0,relwidth=1,relheight=0.04)
 
 label_2=tk.Label(frame, bg="#82E0AA", text="Uneditable")
-label_2.place(relx=0,rely=0.05,relwidth=1,relheight=0.05)
+label_2.place(relx=0,rely=0.04,relwidth=1,relheight=0.04)
 
-label_3=tk.Label(frame, bg="#D2B4DE", text="Current Directory> "+ini_dir)
-label_3.place(relx=0,rely=0.1,relwidth=1,relheight=0.02)
+label_3=tk.Label(frame, bg="#D2B4DE", text="CURRENT DIRECTORY> "+ini_dir)
+label_3.place(relx=0,rely=0.23,relwidth=1,relheight=0.03)
+
+label_4=tk.Label(frame, bg="#F1948A", text="Copy button not found")
+label_4.place(relx=0,rely=0.08,relwidth=1,relheight=0.04)
+
+label_5=tk.Label(frame, bg="#F1948A", text="Input files not generated")
+label_5.place(relx=0,rely=0.16,relwidth=1,relheight=0.04)
+
+label_6=tk.Label(frame, bg="#85C1E9", text="Enter BASIS SET:", anchor='w')
+label_6.place(relx=0,rely=0.29,relwidth=0.15,relheight=0.04)
+
+label_7=tk.Label(frame, bg="#F1948A", text="XYZ files not generated")
+label_7.place(relx=0,rely=0.12,relwidth=1,relheight=0.04)
+
+label_8=tk.Label(frame, bg="#F9E79F", text="ROOT DIRECTORY> "+ini_dir)
+label_8.place(relx=0,rely=0.20,relwidth=1,relheight=0.03)
+
+label_9=tk.Label(frame, bg="#F4F6F7", text=("AUTOCLICKER OPTIONS> Cycle Time: "+str(int(cycle_time/1000))+"s ; Number of Coordinates: "+str(num_coord)))
+label_9.place(relx=0,rely=0.26,relwidth=1,relheight=0.03)
+
+entry=tk.Entry(frame, bg="#85C1E9")
+entry.place(relx=0.15,rely=0.29,relwidth=0.85,relheight=0.04)
 
 textbox=tk.Text(frame, bg='#D0D3D4', height=2000, bd=5, font=("Calibri",10))
-textbox.place(relx=0,rely=0.12, relwidth=1,relheight=0.88)
+textbox.place(relx=0,rely=0.33, relwidth=1,relheight=0.67)
 scrollbar=tk.Scrollbar(textbox)
 scrollbar.pack(side=tk.RIGHT,fill="y")
 textbox.config(state="disabled", yscrollcommand=scrollbar.set)
-
 scrollbar.config(command=textbox.yview)
 
 pyperclip.copy(" ")
 collecting()
 check_dir_state()
+check_XYZfiles()
+check_inputfiles()
+check_autosetup()
 
 root.mainloop()
